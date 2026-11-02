@@ -1,0 +1,24 @@
+services:
+  meal-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meal_bot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ACCOUNT_NAME=${ACCOUNT_NAME}
+      - CBE_ACCOUNT=${CBE_ACCOUNT}
+      - TELEBIRR_ACCOUNT=${TELEBIRR_ACCOUNT}
+      - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID}
+      - DB_PATH=/app/data/meal_bot.db
+    volumes:
+      - meal_bot_data:/app/data
+
+volumes:
+  meal_bot_data:
+    driver: local

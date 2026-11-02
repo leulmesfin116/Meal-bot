@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meal Bot — Kitchen & Orders Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(23, 32, 54, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at top left, #172554, #0b0f19 50%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 32px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 8px 12px;
+      border-radius: 12px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      padding: 20px;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .stat-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Orders Section */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    td {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .order-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .badge-paid {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-pending {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-preparing {
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.3);
+    }
+
+    .badge-completed {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .badge-cancelled {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .tx-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .items-list {
+      font-size: 13px;
+      color: #cbd5e1;
+      max-width: 280px;
+      line-height: 1.4;
+    }
+
+    .action-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      margin-right: 4px;
+      transition: background 0.15s;
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 540px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--text);
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .test-result {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-icon">🍽️</div>
+        <div>
+          <h1>Meal Bot — Kitchen & Orders Live Dashboard</h1>
+          <div class="subtitle">Real-time order pipeline & Bank SMS payment authentication</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" onclick="openSmsTester()">🧪 Test Bank SMS Parser</button>
+        <button class="btn-primary" onclick="loadData()">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <!-- Metrics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">Total Orders</div>
+        <div class="stat-value" id="statOrders">--</div>
+        <div class="stat-hint">Lifetime orders placed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Revenue Collected</div>
+        <div class="stat-value" id="statRevenue">-- ETB</div>
+        <div class="stat-hint">Verified paid orders</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Paid Orders</div>
+        <div class="stat-value" id="statPaid">--</div>
+        <div class="stat-hint">Successfully authenticated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">Pending Payment</div>
+        <div class="stat-value" id="statPending" style="color: var(--warning);">--</div>
+        <div class="stat-hint">Awaiting bank SMS proof</div>
+      </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="section-header">
+      <div class="section-title">📋 Live Customer Orders</div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Order Code</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Ordered Items</th>
+            <th>Total (ETB)</th>
+            <th>Payment Status</th>
+            <th>Bank Tx Reference</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody">
+          <tr>
+            <td colspan="8" class="empty-state">Loading latest orders...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SMS Parser Tester Modal -->
+  <div class="modal-overlay" id="smsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🧪 Bank SMS Parser Simulator</h3>
+        <button class="btn-secondary" style="padding: 4px 8px;" onclick="closeSmsTester()">✕</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+        Paste sample SMS text from CBE, Telebirr, or any mobile bank to test extraction & verification:
+      </p>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <button class="btn-secondary" style="font-size: 12px; padding: 6px 10px;" onclick="fillCbeSample()">Insert CBE Sample</button>
+        <button class="btn-secondary" style="font-size: 12px; padding: 6px 10px;" onclick="fillTelebirrSample()">Insert Telebirr Sample</button>
+      </div>
+
+      <textarea id="modalSmsInput" placeholder="Paste bank SMS here..."></textarea>
+      
+      <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Expected Order Amount (ETB):</label>
+      <input type="number" id="modalAmountInput" value="380" placeholder="e.g. 380">
+
+      <button class="btn-primary" style="width: 100%; justify-content: center;" onclick="runSmsTest()">Verify & Authenticate</button>
+      <div class="test-result" id="modalResult"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        // 1. Fetch stats
+        const statsRes = await fetch('/api/admin/stats');
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          document.getElementById('statOrders').innerText = statsData.data.totalOrders;
+          document.getElementById('statRevenue').innerText = statsData.data.totalRevenue.toFixed(2) + ' ETB';
+          document.getElementById('statPaid').innerText = statsData.data.totalPaidOrders;
+          document.getElementById('statPending').innerText = statsData.data.pendingCount;
+        }
+
+        // 2. Fetch orders
+        const ordersRes = await fetch('/api/orders');
+        const ordersData = await ordersRes.json();
+        const tbody = document.getElementById('ordersTableBody');
+
+        if (!ordersData.data || ordersData.data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No orders placed yet. Orders created via the Telegram bot will appear here automatically!</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = ordersData.data.map(o => {
+          let items = [];
+          try { items = JSON.parse(o.items_json); } catch(e){}
+          const itemsSummary = items.map(i => `${i.name} (x${i.quantity})`).join(', ');
+
+          let badgeClass = 'badge-pending';
+          if (o.status === 'PAID') badgeClass = 'badge-paid';
+          if (o.status === 'PREPARING') badgeClass = 'badge-preparing';
+          if (o.status === 'COMPLETED') badgeClass = 'badge-completed';
+          if (o.status === 'CANCELLED') badgeClass = 'badge-cancelled';
+
+          return `
+            <tr>
+              <td class="order-code">#${o.order_code}</td>
+              <td style="font-weight: 600;">${escapeHtml(o.customer_name || 'N/A')}</td>
+              <td><code>${escapeHtml(o.customer_phone || 'N/A')}</code></td>
+              <td class="items-list">${escapeHtml(itemsSummary)}</td>
+              <td style="font-weight: 700;">${o.total_amount.toFixed(2)}</td>
+              <td><span class="badge ${badgeClass}">${o.status}</span></td>
+              <td>${o.bank_tx_id ? `<span class="tx-ref">${escapeHtml(o.bank_tx_id)}</span>` : '<span style="color: #64748b;">Pending SMS</span>'}</td>
+              <td>
+                <button class="action-btn" title="Set to Preparing" onclick="updateStatus('${o.order_code}', 'PREPARING')">👨‍🍳</button>
+                <button class="action-btn" title="Set to Completed" onclick="updateStatus('${o.order_code}', 'COMPLETED')">✅</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      }
+    }
+
+    async function updateStatus(orderCode, status) {
+      try {
+        const res = await fetch(`/api/orders/${orderCode}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) {
+          loadData();
+        }
+      } catch (err) {
+        alert('Error updating status: ' + err.message);
+      }
+    }
+
+    function openSmsTester() {
+      document.getElementById('smsModal').classList.add('open');
+    }
+
+    function closeSmsTester() {
+      document.getElementById('smsModal').classList.remove('open');
+    }
+
+    function fillCbeSample() {
+      document.getElementById('modalSmsInput').value =
+        "Dear Customer, your account 100012345678 has been debited with ETB 380.00 on 30-10-2026. Reason: Transfer to LEUL MESFIN. Transaction ID: FT241030ABCD987.";
+      document.getElementById('modalAmountInput').value = "380";
+    }
+
+    function fillTelebirrSample() {
+      document.getElementById('modalSmsInput').value =
+        "Dear customer, you have transferred 380.00 Birr to Meal Bot (0911223344) on 30/10/2026 18:30:15. Transaction number is CI241030.1830.B12345.";
+      document.getElementById('modalAmountInput').value = "380";
+    }
+
+    async function runSmsTest() {
+      const smsText = document.getElementById('modalSmsInput').value.trim();
+      const expectedAmount = document.getElementById('modalAmountInput').value.trim();
+      const resultDiv = document.getElementById('modalResult');
+
+      if (!smsText) {
+        alert('Please enter SMS text');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/test-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ smsText, expectedAmount })
+        });
+        const data = await res.json();
+        resultDiv.style.display = 'block';
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerText = 'Error: ' + err.message;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+
+    // Auto-load on open and poll every 8 seconds
+    loadData();
+    setInterval(loadData, 8000);
+  </script>
+</body>
+</html>
