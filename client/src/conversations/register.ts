@@ -87,6 +87,24 @@ export async function registrationConversation(
     }
   );
 
+  // If the user already selected meals and clicked checkout/pay, proceed directly to payment
+  if (phoneCtx.session?.cart && phoneCtx.session.cart.length > 0) {
+    const totalAmount = phoneCtx.session.cart.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+    const { createOrder } = await import("../../db/index");
+    const order = createOrder({
+      user_id: savedUser.id,
+      telegram_id: telegramId,
+      items: [...phoneCtx.session.cart],
+      total_amount: totalAmount,
+    });
+    phoneCtx.session.pendingOrderCode = order.order_code;
+    await conversation.enter("paymentSmsConversation");
+    return;
+  }
+
   await phoneCtx.reply("🍽️ What would you like to eat today?", {
     reply_markup: getDashboardKeyboard(phoneCtx.session?.cart?.length || 0),
   });

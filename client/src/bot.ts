@@ -81,18 +81,19 @@ export function createBot(token: string): Bot<MyContext> {
 
   // /start
   bot.command("start", async (ctx) => {
-    const telegramId = ctx.from?.id;
-    if (!telegramId) return;
-
-    const user = getUserByTelegramId(telegramId);
-    if (!user) {
-      await ctx.conversation.enter("registrationConversation");
-      return;
+    try {
+      await ctx.conversation.exit();
+    } catch {
+      // ignore if no conversation active
     }
+
+    const telegramId = ctx.from?.id;
+    const user = telegramId ? getUserByTelegramId(telegramId) : null;
+    const greetingName = user?.full_name || ctx.from?.first_name || "there";
 
     await ctx.reply(
       `🍽️ **Welcome to Mati Meals!**\n\n` +
-        `We're delighted to have you, ${user.full_name}! 😊\n` +
+        `We're delighted to have you, ${greetingName}! 😊\n` +
         `Tap the button below to browse our menu and place your order.`,
       {
         parse_mode: "Markdown",
@@ -103,7 +104,6 @@ export function createBot(token: string): Bot<MyContext> {
 
   // /menu
   bot.command("menu", async (ctx) => {
-    if (!(await ensureRegistered(ctx))) return;
     const items = getAllMenuItems();
     await ctx.reply("🍽️ **Today's Fresh Menu**\nTap any meal to select quantity and add to cart:", {
       parse_mode: "Markdown",
@@ -153,7 +153,6 @@ export function createBot(token: string): Bot<MyContext> {
 
   // Reply Keyboard text shortcuts
   bot.hears("🍽️ Menu", async (ctx) => {
-    if (!(await ensureRegistered(ctx))) return;
     const items = getAllMenuItems();
     await ctx.reply("🍽️ **Today's Fresh Menu**:", {
       parse_mode: "Markdown",
@@ -196,9 +195,17 @@ export function createBot(token: string): Bot<MyContext> {
     if (data === "action:show_menu") {
       await ctx.answerCallbackQuery();
       const items = getAllMenuItems();
-      await ctx.editMessageText("🍽️ **Select an item to customize quantity:**", {
-        reply_markup: getMenuKeyboard(items, ctx.session.cart),
-      });
+      try {
+        await ctx.editMessageText("🍽️ **Select an item to customize quantity:**", {
+          parse_mode: "Markdown",
+          reply_markup: getMenuKeyboard(items, ctx.session.cart),
+        });
+      } catch {
+        await ctx.reply("🍽️ **Select an item to customize quantity:**", {
+          parse_mode: "Markdown",
+          reply_markup: getMenuKeyboard(items, ctx.session.cart),
+        });
+      }
       return;
     }
 
@@ -359,6 +366,52 @@ export function createBot(token: string): Bot<MyContext> {
       return;
     }
 
+    // View CBE Details separately
+    if (data.startsWith("action:pay_info_cbe:")) {
+      const orderCode = data.replace("action:pay_info_cbe:", "");
+      const order = getOrderByCode(orderCode);
+      const cbeAccount = process.env.CBE_ACCOUNT || "1000511676208";
+      const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
+      const amount = order ? `${order.total_amount.toFixed(2)} ETB` : "exact order total";
+
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `🏦 **Commercial Bank of Ethiopia (CBE)**\n\n` +
+          `• **Account Number:** \`${cbeAccount}\` *(tap to copy)*\n` +
+          `• **Account Holder:** ${accountHolder}\n` +
+          `• **Amount to Pay:** **${amount}**\n\n` +
+          `👉 After transferring from your CBE Mobile Banking, copy and paste the bank SMS here!`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: getPaymentActionsKeyboard(orderCode),
+        }
+      );
+      return;
+    }
+
+    // View Telebirr Details separately
+    if (data.startsWith("action:pay_info_telebirr:")) {
+      const orderCode = data.replace("action:pay_info_telebirr:", "");
+      const order = getOrderByCode(orderCode);
+      const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0900055363";
+      const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
+      const amount = order ? `${order.total_amount.toFixed(2)} ETB` : "exact order total";
+
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `📱 **Telebirr Transfer Details**\n\n` +
+          `• **Telebirr Number:** \`${telebirrAccount}\` *(tap to copy)*\n` +
+          `• **Account Holder:** ${accountHolder}\n` +
+          `• **Amount to Pay:** **${amount}**\n\n` +
+          `👉 After transferring from Telebirr, copy and paste the confirmation SMS here!`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: getPaymentActionsKeyboard(orderCode),
+        }
+      );
+      return;
+    }
+
     // Check payment status
     if (data.startsWith("action:check_status:")) {
       const orderCode = data.replace("action:check_status:", "");
@@ -433,11 +486,17 @@ export function createBot(token: string): Bot<MyContext> {
       const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
 
       await ctx.editMessageText(
-        `🏦 **Official Bank & Mobile Transfer Accounts**\n\n` +
-          `• **Commercial Bank of Ethiopia (CBE):**\n  Account: \`${cbeAccount}\`\n\n` +
-          `• **Telebirr:**\n  Number: \`${telebirrAccount}\`\n\n` +
-          `• **Account Name:** ${accountHolder}\n\n` +
-          `*Note: Always copy and paste the bank SMS message after transferring to instantly authenticate your payment!*`,
+        `🏦 **Official Payment & Transfer Accounts**\n\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🏦 **1. Commercial Bank of Ethiopia (CBE)**\n` +
+          `• **Account Number:** \`${cbeAccount}\` *(tap to copy)*\n` +
+          `• **Account Name:** ${accountHolder}\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `📱 **2. Telebirr**\n` +
+          `• **Telebirr Number:** \`${telebirrAccount}\` *(tap to copy)*\n` +
+          `• **Account Name:** ${accountHolder}\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `*Note: After making a transfer, copy and paste the SMS confirmation here for instant automatic order confirmation!*`,
         {
           parse_mode: "Markdown",
           reply_markup: getDashboardKeyboard(ctx.session.cart.length),

@@ -70,9 +70,17 @@ export function getItemDetailKeyboard(item: MenuItem, currentQuantity: number) {
     .text("➖", `action:cart_dec:${item.id}`)
     .text(`Qty: ${currentQuantity}`, `action:item_info:${item.id}`)
     .text("➕", `action:cart_inc:${item.id}`)
-    .row()
+    .row();
+
+  if (currentQuantity > 0) {
+    keyboard
+      .text("💳 Proceed to Payment", "action:checkout_order")
+      .row();
+  }
+
+  keyboard
     .text("🍽️ Back to Menu", "action:show_menu")
-    .text("🛒 Checkout", "action:view_cart");
+    .text("🛒 View Cart", "action:view_cart");
 
   return keyboard;
 }
@@ -93,7 +101,7 @@ export function getCartKeyboard(cart: CartItem[]) {
 
   if (cart.length > 0) {
     keyboard
-      .text("✅ Confirm Order & Pay", "action:checkout_order")
+      .text("💳 Confirm Order & Pay", "action:checkout_order")
       .row()
       .text("➕ Add More Meals", "action:show_menu")
       .text("🗑️ Clear Cart", "action:clear_cart")
@@ -111,6 +119,9 @@ export function getCartKeyboard(cart: CartItem[]) {
  */
 export function getPaymentActionsKeyboard(orderCode: string) {
   return new InlineKeyboard()
+    .text("🏦 View CBE Details", `action:pay_info_cbe:${orderCode}`)
+    .text("📱 View Telebirr Details", `action:pay_info_telebirr:${orderCode}`)
+    .row()
     .text("📩 Paste / Forward Bank SMS", `action:submit_sms:${orderCode}`)
     .row()
     .text("🔄 Check Payment Status", `action:check_status:${orderCode}`)

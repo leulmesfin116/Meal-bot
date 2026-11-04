@@ -4,6 +4,7 @@ dotenv.config();
 import path from "node:path";
 import express, { Request, Response } from "express";
 import {
+  db,
   seedInitialMenuIfEmpty,
   getAllMenuItems,
   getAllOrdersWithUsers,
@@ -56,7 +57,20 @@ app.post("/api/orders/:code/status", (req: Request, res: Response) => {
   res.json({ success: true, orderCode: code, newStatus: status });
 });
 
-// API: Menu endpoint
+// Admin endpoint to reset and reseed menu (development only)
+app.get("/api/admin/reset-menu", (req: Request, res: Response) => {
+  try {
+    // Clear existing menu items
+    db.exec("DELETE FROM menu_items");
+    // Reseed menu
+    seedInitialMenuIfEmpty();
+    res.json({ success: true, message: "Menu reset and reseeded." });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: "Failed to reset menu." });
+  }
+});
+
 app.get("/api/menu", (req: Request, res: Response) => {
   const menu = getAllMenuItems();
   res.json({ success: true, count: menu.length, data: menu });

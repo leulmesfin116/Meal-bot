@@ -48,21 +48,30 @@ export async function paymentSmsConversation(
   const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
 
   await ctx.reply(
-    `💳 **Payment Authentication for Order #${order.order_code}**\n\n` +
+    `💳 **Payment for Order #${order.order_code}**\n\n` +
       `🧾 **Order Summary:**\n${itemsSummary}\n\n` +
       `💰 **Total Due:** **${order.total_amount.toFixed(2)} ETB**\n\n` +
-      `──────────────────────────────\n` +
-      `🏦 **Transfer Account Details:**\n` +
-      `• **CBE (Commercial Bank):** \`${cbeAccount}\`\n` +
-      `• **Telebirr:** \`${telebirrAccount}\`\n` +
+      `Please choose either **CBE** or **Telebirr** to transfer the payment:\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏦 **OPTION 1: Commercial Bank of Ethiopia (CBE)**\n` +
+      `• **Account Number:** \`${cbeAccount}\` *(tap to copy)*\n` +
       `• **Account Name:** ${accountHolder}\n` +
-      `──────────────────────────────\n\n` +
-      `📲 **How to authenticate:**\n` +
-      `1. Make a transfer of **${order.total_amount.toFixed(2)} ETB** to the account above.\n` +
-      `2. Copy the **SMS confirmation** you received from your bank.\n` +
-      `3. **Paste or forward the SMS message here**:\n\n` +
+      `• **Amount to Pay:** **${order.total_amount.toFixed(2)} ETB**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📱 **OPTION 2: Telebirr**\n` +
+      `• **Telebirr Number:** \`${telebirrAccount}\` *(tap to copy)*\n` +
+      `• **Account Name:** ${accountHolder}\n` +
+      `• **Amount to Pay:** **${order.total_amount.toFixed(2)} ETB**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `📲 **Next Steps:**\n` +
+      `1. Transfer **${order.total_amount.toFixed(2)} ETB** using **CBE** or **Telebirr** above.\n` +
+      `2. Copy the confirmation SMS from your bank / Telebirr.\n` +
+      `3. **Paste or forward the SMS here** (or upload a screenshot of the receipt):\n\n` +
       `*(Send /cancel to return without verifying now)*`,
-    { parse_mode: "Markdown" }
+    {
+      parse_mode: "Markdown",
+      reply_markup: getPaymentActionsKeyboard(order.order_code),
+    }
   );
 
   // Await SMS message or screenshot photo
