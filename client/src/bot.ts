@@ -357,16 +357,56 @@ export function createBot(token: string): Bot<MyContext> {
       });
 
       ctx.session.pendingOrderCode = order.order_code;
-      await ctx.answerCallbackQuery({ text: "Proceeding to payment..." });
+      await ctx.answerCallbackQuery();
+
+      const items: CartItem[] = order.items_json ? JSON.parse(order.items_json) : ctx.session.cart;
+      const itemsSummary = items
+        .map((i) => `• ${i.name} (x${i.quantity}) - ${(i.price * i.quantity).toFixed(2)} ETB`)
+        .join("\n");
+
+      const cbeAccount = process.env.CBE_ACCOUNT || "1000511676208";
+      const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0900055363";
+      const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
+
+      const paymentText =
+        `💳 **Payment for Order #${order.order_code}**\n\n` +
+        `🧾 **Order Summary:**\n${itemsSummary}\n\n` +
+        `💰 **Total Due:** **${order.total_amount.toFixed(2)} ETB**\n\n` +
+        `Please choose either **CBE** or **Telebirr** to transfer the payment:\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🏦 **OPTION 1: Commercial Bank of Ethiopia (CBE)**\n` +
+        `• **Account Number:** \`${cbeAccount}\` *(tap to copy)*\n` +
+        `• **Account Name:** ${accountHolder}\n` +
+        `• **Amount to Pay:** **${order.total_amount.toFixed(2)} ETB**\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `📱 **OPTION 2: Telebirr**\n` +
+        `• **Telebirr Number:** \`${telebirrAccount}\` *(tap to copy)*\n` +
+        `• **Account Name:** ${accountHolder}\n` +
+        `• **Amount to Pay:** **${order.total_amount.toFixed(2)} ETB**\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📲 **Next Steps:**\n` +
+        `1. Transfer **${order.total_amount.toFixed(2)} ETB** via **CBE** or **Telebirr** above.\n` +
+        `2. Copy the confirmation SMS from your bank / Telebirr.\n` +
+        `3. **Paste or forward the SMS here** (or send a photo/screenshot of the receipt) to confirm!`;
 
       try {
-        await ctx.conversation.exit();
+        await ctx.editMessageText(paymentText, {
+          parse_mode: "Markdown",
+          reply_markup: getPaymentActionsKeyboard(order.order_code),
+        });
       } catch {
-        // ignore
+        await ctx.reply(paymentText, {
+          parse_mode: "Markdown",
+          reply_markup: getPaymentActionsKeyboard(order.order_code),
+        });
       }
 
-      // Start the payment SMS authentication conversation
-      await ctx.conversation.enter("paymentSmsConversation");
+      // Enter payment conversation to listen for incoming SMS or receipt
+      try {
+        await ctx.conversation.enter("paymentSmsConversation");
+      } catch {
+        // ignore if already active
+      }
       return;
     }
 
@@ -375,7 +415,14 @@ export function createBot(token: string): Bot<MyContext> {
       const orderCode = data.replace("action:submit_sms:", "");
       ctx.session.pendingOrderCode = orderCode;
       await ctx.answerCallbackQuery();
-      await ctx.conversation.enter("paymentSmsConversation");
+      await ctx.reply("📲 **Please paste or forward the bank SMS text here:**\n*(Or send /cancel to exit)*", {
+        parse_mode: "Markdown",
+      });
+      try {
+        await ctx.conversation.enter("paymentSmsConversation");
+      } catch {
+        // ignore
+      }
       return;
     }
 
