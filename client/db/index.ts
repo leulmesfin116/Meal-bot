@@ -170,6 +170,45 @@ export function getMenuItemById(id: number): MenuItem | null {
 export function seedInitialMenuIfEmpty(): void {
   const countStmt = db.prepare("SELECT COUNT(*) as count FROM menu_items");
   const row = countStmt.get() as unknown as { count: number };
+  const insertStmt = db.prepare(
+    "INSERT INTO menu_items (name, category, description, price, emoji, is_available) VALUES (?, ?, ?, ?, ?, 1)"
+  );
+
+  const initialMenu = [
+    { name: "Special Doro Wat", category: "Traditional Meals", description: "Rich, spiced slow-cooked chicken stew with hard-boiled egg and fresh injera.", price: 380, emoji: "🍗" },
+    { name: "Beef Tibs with Injera", category: "Traditional Meals", description: "Sizzling tender beef cubes sautéed with onions, rosemary, and jalapeños.", price: 320, emoji: "🥩" },
+    { name: "Special Veggie Beyaynetu", category: "Traditional Meals", description: "Vibrant combination of shiro, lentils, collard greens, and spicy cabbage on injera.", price: 220, emoji: "🥗" },
+    { name: "Chechebsa (Kita Firfir)", category: "Breakfast", description: "Pan-fried shredded flatbread tossed in spiced berbere butter and pure honey.", price: 180, emoji: "🥞" },
+    { name: "Scrambled Eggs with Beef", category: "Breakfast", description: "Fluffy scrambled eggs cooked with minced beef, tomatoes, and toasted fresh bread.", price: 190, emoji: "🍳" },
+    { name: "Gourmet Meal Burger & Fries", category: "Fast Food", description: "Juicy beef patty with caramelized onions, cheddar cheese, and crispy fries.", price: 290, emoji: "🍔" },
+    { name: "Fresh Mango Avocado Juice", category: "Beverages", description: "Layered fresh mango and avocado smoothie with a dash of lime.", price: 110, emoji: "🥑" },
+    { name: "Traditional Spiced Tea / Coffee", category: "Beverages", description: "Aromatic Ethiopian coffee or spiced tea brewed with cinnamon and cardamom.", price: 60, emoji: "☕" },
+    { name: "ሩዝ በተሲቲ ሶያ፣ አትክልትና እንቁላል", category: "Rice", description: "Rice with tomato sauce, vegetables, and eggs", price: 210, emoji: "🍚" },
+    { name: "ሩዝ በተሲቲ ሶያና አትክልት", category: "Rice", description: "Rice with tomato sauce and vegetables", price: 160, emoji: "🍚" },
+    { name: "ሩዝ በተሲቲ ሶያ", category: "Rice", description: "Rice with tomato sauce", price: 150, emoji: "🍚" },
+    { name: "ፓስታ በተሲቲ ሶያ፣ አትክልትና እንቁላል", category: "Pasta", description: "Pasta with tomato sauce, vegetables, and eggs", price: 230, emoji: "🍝" },
+  ];
+
+  // If there are no items, insert all at once.
+  if (row.count === 0) {
+    for (const item of initialMenu) {
+      insertStmt.run(item.name, item.category, item.description, item.price, item.emoji);
+    }
+    return;
+  }
+
+  // Otherwise, ensure each item exists (prevent duplicates).
+  const existsStmt = db.prepare("SELECT COUNT(*) as cnt FROM menu_items WHERE name = ?");
+  for (const item of initialMenu) {
+    const exists = (existsStmt.get(item.name) as unknown as { cnt: number }).cnt;
+    if (exists === 0) {
+      insertStmt.run(item.name, item.category, item.description, item.price, item.emoji);
+    }
+  }
+}
+
+  const countStmt = db.prepare("SELECT COUNT(*) as count FROM menu_items");
+  const row = countStmt.get() as unknown as { count: number };
   if (row.count === 0) {
     const insertStmt = db.prepare(
       "INSERT INTO menu_items (name, category, description, price, emoji, is_available) VALUES (?, ?, ?, ?, ?, 1)"
