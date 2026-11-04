@@ -322,18 +322,25 @@ export function createBot(token: string): Bot<MyContext> {
     // Checkout Order
     if (data === "action:checkout_order") {
       if (!ctx.session.cart || ctx.session.cart.length === 0) {
-        await ctx.answerCallbackQuery({ text: "Your cart is empty!" });
+        await ctx.answerCallbackQuery({ text: "Your cart is empty! Please select a meal first." });
         return;
       }
 
       const telegramId = ctx.from?.id;
       if (!telegramId) return;
 
-      const user = getUserByTelegramId(telegramId);
+      let user = getUserByTelegramId(telegramId);
       if (!user) {
-        await ctx.answerCallbackQuery();
-        await ctx.conversation.enter("registrationConversation");
-        return;
+        const fullName =
+          [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ") ||
+          ctx.from.username ||
+          "Customer";
+        user = saveUser({
+          telegram_id: telegramId,
+          username: ctx.from.username || null,
+          full_name: fullName,
+          phone_number: "Telegram User",
+        });
       }
 
       const totalAmount = ctx.session.cart.reduce(
@@ -350,7 +357,13 @@ export function createBot(token: string): Bot<MyContext> {
       });
 
       ctx.session.pendingOrderCode = order.order_code;
-      await ctx.answerCallbackQuery({ text: "Order created!" });
+      await ctx.answerCallbackQuery({ text: "Proceeding to payment..." });
+
+      try {
+        await ctx.conversation.exit();
+      } catch {
+        // ignore
+      }
 
       // Start the payment SMS authentication conversation
       await ctx.conversation.enter("paymentSmsConversation");

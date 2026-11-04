@@ -101,7 +101,7 @@ export async function registrationConversation(
       total_amount: totalAmount,
     });
     phoneCtx.session.pendingOrderCode = order.order_code;
-    await conversation.enter("paymentSmsConversation");
+    await phoneCtx.conversation.enter("paymentSmsConversation");
     return;
   }
 
