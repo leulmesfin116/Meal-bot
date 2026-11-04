@@ -43,9 +43,9 @@ export async function paymentSmsConversation(
     .map((i) => `• ${i.name} (x${i.quantity}) - ${(i.price * i.quantity).toFixed(2)} ETB`)
     .join("\n");
 
-  const cbeAccount = process.env.CBE_ACCOUNT || "1000123456789";
-  const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0911223344";
-  const accountHolder = process.env.ACCOUNT_NAME || "Meal Bot / Leul Mesfin";
+  const cbeAccount = process.env.CBE_ACCOUNT || "1000511676208";
+  const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0900055363";
+  const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
 
   await ctx.reply(
     `💳 **Payment Authentication for Order #${order.order_code}**\n\n` +

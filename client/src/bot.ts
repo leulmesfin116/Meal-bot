@@ -1,4 +1,4 @@
-import { Bot, session } from "grammy";
+import { Bot, session, InlineKeyboard } from "grammy";
 import { conversations, createConversation } from "@grammyjs/conversations";
 import { MyContext, SessionData } from "./types";
 import { registrationConversation } from "./conversations/register";
@@ -90,22 +90,15 @@ export function createBot(token: string): Bot<MyContext> {
       return;
     }
 
-    const cartCount = ctx.session.cart.reduce((a, b) => a + b.quantity, 0);
     await ctx.reply(
-      `👋 **Welcome back, ${user.full_name}!** 🍽️\n\n` +
-        `Ready for something delicious today?\n` +
-        `• Browse our hot meals & combos\n` +
-        `• Add to your order\n` +
-        `• Pay easily using **CBE** or **Telebirr** and authenticate with your **Bank SMS**!`,
+      `🍽️ **Welcome to Mati Meals!**\n\n` +
+        `We're delighted to have you, ${user.full_name}! 😊\n` +
+        `Tap the button below to browse our menu and place your order.`,
       {
         parse_mode: "Markdown",
-        reply_markup: persistentMainMenuKeyboard,
+        reply_markup: new InlineKeyboard().text("Order", "action:show_menu"),
       }
     );
-
-    await ctx.reply("Select an option below to get started:", {
-      reply_markup: getDashboardKeyboard(cartCount),
-    });
   });
 
   // /menu
@@ -435,9 +428,9 @@ export function createBot(token: string): Bot<MyContext> {
     // Bank account information
     if (data === "action:bank_info") {
       await ctx.answerCallbackQuery();
-      const cbeAccount = process.env.CBE_ACCOUNT || "1000123456789";
-      const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0911223344";
-      const accountHolder = process.env.ACCOUNT_NAME || "Meal Bot / Leul Mesfin";
+      const cbeAccount = process.env.CBE_ACCOUNT || "1000511676208";
+      const telebirrAccount = process.env.TELEBIRR_ACCOUNT || "0900055363";
+      const accountHolder = process.env.ACCOUNT_NAME || "Matiyas Mahmud";
 
       await ctx.editMessageText(
         `🏦 **Official Bank & Mobile Transfer Accounts**\n\n` +

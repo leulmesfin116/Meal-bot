@@ -232,7 +232,11 @@ export function seedInitialMenuIfEmpty(): void {
         price: 60,
         emoji: "☕",
       },
-    ];
+        { name: "ሩዝ በተሲቲ ሶያ፣ አትክልትና እንቁላል", category: "Rice", description: "Rice with tomato sauce, vegetables, and eggs", price: 210, emoji: "🍚" },
+        { name: "ሩዝ በተሲቲ ሶያና አትክልት", category: "Rice", description: "Rice with tomato sauce and vegetables", price: 160, emoji: "🍚" },
+        { name: "ሩዝ በተሲቲ ሶያ", category: "Rice", description: "Rice with tomato sauce", price: 150, emoji: "🍚" },
+        { name: "ፓስታ በተሲቲ ሶያ፣ አትክልትና እንቁላል", category: "Pasta", description: "Pasta with tomato sauce, vegetables, and eggs", price: 230, emoji: "🍝" },
+        ];
 
     for (const item of initialMenu) {
       insertStmt.run(

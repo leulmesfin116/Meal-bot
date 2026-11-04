@@ -43,9 +43,9 @@ app.get("/api/orders", (req: Request, res: Response) => {
 
 // API: Update order status
 app.post("/api/orders/:code/status", (req: Request, res: Response) => {
-  const { code } = req.params;
+  const code = Array.isArray(req.params.code) ? req.params.code[0] : req.params.code;
   const { status } = req.body;
-  const order = getOrderByCode(code);
+  const order = code ? getOrderByCode(code) : null;
 
   if (!order) {
     res.status(404).json({ error: "Order not found" });

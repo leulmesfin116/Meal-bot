@@ -30,9 +30,9 @@ A full-featured Telegram bot built with **TypeScript**, **grammY**, **Express**,
 ### 2. Configure Bank Transfer Accounts
 In [client/.env](file:///c:/Users/danme/Desktop/meal/client/.env), configure your recipient accounts:
 ```env
-ACCOUNT_NAME=Meal Bot / Leul Mesfin
-CBE_ACCOUNT=1000123456789
-TELEBIRR_ACCOUNT=0911223344
+ACCOUNT_NAME=Matiyas Mahmud
+CBE_ACCOUNT=1000511676208
+TELEBIRR_ACCOUNT=0900055363
 ADMIN_TELEGRAM_ID=  # Optional: your numeric Telegram ID for instant paid order alerts
 ```
 
@@ -76,12 +76,12 @@ You can test payment verification right in Telegram by placing an order and past
 
 ### Sample CBE SMS:
 ```text
-Dear John Doe, your account 100012345678 has been debited with ETB 380.00 on 30-10-2026. Reason: Transfer to LEUL MESFIN. Transaction ID: FT241030ABCD987.
+Dear Customer, your account 100012345678 has been debited with ETB 380.00 on 30-10-2026. Reason: Transfer to MATIYAS MAHMUD. Transaction ID: FT241030ABCD987.
 ```
 
 ### Sample Telebirr SMS:
 ```text
-Dear customer, you have transferred 380.00 Birr to Meal Bot (0911223344) on 30/10/2026 18:30:15. Transaction number is CI241030.1830.B12345.
+Dear customer, you have transferred 380.00 Birr to Matiyas Mahmud (0900055363) on 30/10/2026 18:30:15. Transaction number is CI241030.1830.B12345.
 ```
 
 The bot will automatically:
@@ -102,3 +102,89 @@ The bot will automatically:
 - [client/src/keyboards.ts](file:///c:/Users/danme/Desktop/meal/client/src/keyboards.ts): Inline keyboards and custom reply keyboards.
 - [client/utilis/smsParser.ts](file:///c:/Users/danme/Desktop/meal/client/utilis/smsParser.ts): Robust Bank SMS regex parser & fraud detection engine.
 - [client/db/index.ts](file:///c:/Users/danme/Desktop/meal/client/db/index.ts): Synchronous SQLite database models (`users`, `menu_items`, `orders`, `payments`).
+
+---
+
+## 🚀 Deployment Guide
+
+### Prerequisites
+- **Node.js**: Version **22+** (required for `node:sqlite` DatabaseSync)
+- **Telegram Bot Token**: From [@BotFather](https://t.me/botfather)
+
+---
+
+### Option 1: Docker & Docker Compose (Recommended - Quickest & Most Reliable)
+
+1. Create your environment file:
+   ```bash
+   cp client/.env.example .env
+   # Edit .env with your BOT_TOKEN and bank details
+   ```
+
+2. Start the container in background:
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Check logs:
+   ```bash
+   docker compose logs -f
+   ```
+
+> SQLite database is automatically persisted safely inside the `meal_bot_data` volume.
+
+---
+
+### Option 2: Linux VPS (Ubuntu / Debian with PM2 + Nginx)
+
+1. **Install Node.js 22 & PM2**:
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+   sudo npm install -g pm2
+   ```
+
+2. **Clone & Install**:
+   ```bash
+   git clone <YOUR_REPO_URL> meal
+   cd meal/client
+   npm install
+   cp .env.example .env
+   nano .env # Paste your BOT_TOKEN and settings
+   ```
+
+3. **Start with PM2 (Auto-restart on crash & reboot)**:
+   ```bash
+   pm2 start "npm start" --name "meal-bot"
+   pm2 save
+   pm2 startup
+   ```
+
+4. **(Optional) Expose Web Dashboard with Nginx & SSL**:
+   ```nginx
+   server {
+       server_name meals.yourdomain.com;
+       location / {
+           proxy_pass http://127.0.0.1:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
+   Run `sudo certbot --nginx -d meals.yourdomain.com` for free HTTPS.
+
+---
+
+### Option 3: Cloud Hosting (Railway, Fly.io, or Render)
+
+#### **Railway** (Zero config + Persistent Volume):
+1. Push code to GitHub.
+2. Link your repository in [Railway.app](https://railway.app).
+3. Set **Root Directory** to `client` (or use the root Dockerfile).
+4. Add Environment Variables (`BOT_TOKEN`, `ACCOUNT_NAME`, `CBE_ACCOUNT`, `TELEBIRR_ACCOUNT`).
+5. Under Settings -> **Volumes**, add a persistent volume mounted to `/app/data` and set `DB_PATH=/app/data/meal_bot.db`.
+6. Railway will automatically keep the bot running 24/7!
+
