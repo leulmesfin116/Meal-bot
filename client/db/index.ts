@@ -60,6 +60,11 @@ db.exec(`
     verified_status TEXT DEFAULT 'VALID',
     FOREIGN KEY(order_id) REFERENCES orders(id)
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 export interface User {
@@ -341,4 +346,29 @@ export function getAdminStats(): AdminStats {
     totalRevenue: paidOrders.total,
     pendingCount: pendingCount,
   };
+}
+
+export function getAdminTelegramId(): string | null {
+  const envAdmin = process.env.ADMIN_TELEGRAM_ID?.trim();
+  if (envAdmin && envAdmin.length > 0 && !isNaN(Number(envAdmin))) {
+    return envAdmin;
+  }
+  try {
+    const stmt = db.prepare("SELECT value FROM settings WHERE key = 'admin_telegram_id'");
+    const row = stmt.get() as unknown as { value: string } | undefined;
+    return row ? row.value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAdminTelegramId(telegramId: number | string): void {
+  try {
+    const stmt = db.prepare(
+      "INSERT INTO settings (key, value) VALUES ('admin_telegram_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+    );
+    stmt.run(telegramId.toString());
+  } catch (err) {
+    console.warn("Could not save admin telegram ID to settings:", err);
+  }
 }

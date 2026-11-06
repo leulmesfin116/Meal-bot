@@ -13,6 +13,8 @@ import {
   updateOrderStatus,
   getAdminStats,
   recordPayment,
+  getAdminTelegramId,
+  setAdminTelegramId,
 } from "../db/index";
 import {
   getDashboardKeyboard,
@@ -59,9 +61,19 @@ export function createBot(token: string): Bot<MyContext> {
   // /admin
   bot.command("admin", async (ctx) => {
     const telegramId = ctx.from?.id;
-    const adminId = process.env.ADMIN_TELEGRAM_ID;
+    if (!telegramId) return;
 
-    if (!adminId || telegramId?.toString() !== adminId.trim()) {
+    let adminId = getAdminTelegramId();
+
+    if (!adminId) {
+      setAdminTelegramId(telegramId);
+      adminId = telegramId.toString();
+      await ctx.reply(
+        `👑 **You are now registered as the Restaurant Admin!** (ID: \`${telegramId}\`)\n\n` +
+          `All customer payment SMS texts and receipts will be forwarded directly to you here with 1-click **[Approve]** and **[Reject]** buttons.`,
+        { parse_mode: "Markdown" }
+      );
+    } else if (telegramId.toString() !== adminId) {
       await ctx.reply("⛔ Access restricted: You are not authorized as an administrator.");
       return;
     }
@@ -75,6 +87,29 @@ export function createBot(token: string): Bot<MyContext> {
         `• 💰 **Total Revenue:** **${stats.totalRevenue.toFixed(2)} ETB**\n` +
         `• ⏳ **Pending Payment Orders:** ${stats.pendingCount}\n\n` +
         `*Live kitchen alerts & receipt approval requests will appear here in real time.*`,
+      { parse_mode: "Markdown" }
+    );
+  });
+
+  // /setadmin <telegram_id>
+  bot.command("setadmin", async (ctx) => {
+    const rawTarget = ctx.match?.trim();
+    if (!rawTarget || isNaN(Number(rawTarget))) {
+      const currentAdmin = getAdminTelegramId() || "Not set";
+      await ctx.reply(
+        `ℹ️ **How to assign another person as Admin:**\n\n` +
+          `Current Admin ID: \`${currentAdmin}\`\n\n` +
+          `1. Ask that person to open [@userinfobot](https://t.me/userinfobot) on Telegram and copy their **Id** (e.g. \`123456789\`).\n` +
+          `2. Send: \`/setadmin 123456789\` (replace with their number).\n\n` +
+          `*Or simply paste it in your \`client/.env\` file as:* \`ADMIN_TELEGRAM_ID=123456789\`.`,
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    setAdminTelegramId(rawTarget);
+    await ctx.reply(
+      `✅ **Admin assigned successfully!**\n\nNew Admin Telegram ID: \`${rawTarget}\`\nAll customer order payment approvals will now be sent directly to that person.`,
       { parse_mode: "Markdown" }
     );
   });
@@ -565,7 +600,7 @@ export function createBot(token: string): Bot<MyContext> {
       return;
     }
 
-    // Admin: Approve Receipt
+    // Admin: Approve Receipt or SMS
     if (data.startsWith("admin:approve_order:")) {
       const orderCode = data.replace("admin:approve_order:", "");
       const order = getOrderByCode(orderCode);
@@ -580,30 +615,33 @@ export function createBot(token: string): Bot<MyContext> {
         return;
       }
 
-      const manualTxId = `ADMIN_VERIFIED_${Date.now()}`;
+      const verifiedTxId = order.bank_tx_id || `ADMIN_VERIFIED_${Date.now()}`;
       recordPayment({
         order_id: order.id,
-        bank_name: "Manual Review (Admin Approved)",
-        tx_id: manualTxId,
+        bank_name: "Admin Verified Transfer",
+        tx_id: verifiedTxId,
         amount: order.total_amount,
-        raw_sms: "Approved via Admin Telegram Screenshot Review",
+        raw_sms: "Verified & Approved via Admin Telegram Review",
         verified_status: "ADMIN_APPROVED",
       });
 
-      updateOrderStatus(order.id, "PAID", manualTxId);
+      updateOrderStatus(order.id, "PAID", verifiedTxId);
       await ctx.answerCallbackQuery({ text: "Order Approved!" });
 
+      const approvalText =
+        `✅ **Order #${order.order_code} APPROVED by Admin!**\n\n` +
+        `• **Amount:** ${order.total_amount.toFixed(2)} ETB\n` +
+        `• **Reference:** \`${verifiedTxId}\`\n` +
+        `• **Status:** PAID & Sent to Kitchen 👨‍🍳`;
+
       try {
-        await ctx.editMessageCaption({
-          caption:
-            `✅ **Order #${order.order_code} APPROVED by Admin!**\n\n` +
-            `• **Amount:** ${order.total_amount.toFixed(2)} ETB\n` +
-            `• **Reference:** \`${manualTxId}\`\n` +
-            `• **Status:** PAID & Moved to Kitchen 👨‍🍳`,
-          parse_mode: "Markdown",
-        });
+        await ctx.editMessageText(approvalText, { parse_mode: "Markdown" });
       } catch {
-        // Caption edit fallback
+        try {
+          await ctx.editMessageCaption({ caption: approvalText, parse_mode: "Markdown" });
+        } catch {
+          // ignore
+        }
       }
 
       // Notify customer directly
@@ -614,7 +652,7 @@ export function createBot(token: string): Bot<MyContext> {
             `Your payment for Order **#${order.order_code}** (${order.total_amount.toFixed(
               2
             )} ETB) has been verified and approved by the restaurant!\n\n` +
-            `👨‍🍳 Our kitchen has started preparing your fresh meal. We will notify you when it's on the way!`,
+            `👨‍🍳 Our kitchen has started preparing your fresh meal. We will notify you when it's ready!`,
           { parse_mode: "Markdown" }
         );
       } catch (err) {
@@ -623,7 +661,7 @@ export function createBot(token: string): Bot<MyContext> {
       return;
     }
 
-    // Admin: Reject Receipt
+    // Admin: Reject Receipt or SMS
     if (data.startsWith("admin:reject_order:")) {
       const orderCode = data.replace("admin:reject_order:", "");
       const order = getOrderByCode(orderCode);
@@ -635,13 +673,18 @@ export function createBot(token: string): Bot<MyContext> {
 
       await ctx.answerCallbackQuery({ text: "Order Payment Rejected" });
 
+      const rejectionText =
+        `❌ **Order #${order.order_code} Payment REJECTED.**\n` +
+        `Customer has been notified to re-check their transfer.`;
+
       try {
-        await ctx.editMessageCaption({
-          caption: `❌ **Order #${order.order_code} Payment REJECTED.**\nCustomer has been notified to re-submit proof.`,
-          parse_mode: "Markdown",
-        });
+        await ctx.editMessageText(rejectionText, { parse_mode: "Markdown" });
       } catch {
-        // Caption edit fallback
+        try {
+          await ctx.editMessageCaption({ caption: rejectionText, parse_mode: "Markdown" });
+        } catch {
+          // ignore
+        }
       }
 
       // Notify customer
@@ -649,10 +692,10 @@ export function createBot(token: string): Bot<MyContext> {
         await ctx.api.sendMessage(
           order.telegram_id,
           `⚠️ **Payment Verification Update for Order #${order.order_code}**\n\n` +
-            `The restaurant could not verify your receipt screenshot.\n` +
+            `The restaurant could not verify your payment transfer.\n` +
             `Please make sure you transferred **${order.total_amount.toFixed(
               2
-            )} ETB** and paste the text of the **Bank SMS** message using /orders to re-verify.`,
+            )} ETB** to our CBE or Telebirr account, and paste the bank SMS message again to verify.`,
           {
             parse_mode: "Markdown",
             reply_markup: getPaymentActionsKeyboard(order.order_code),

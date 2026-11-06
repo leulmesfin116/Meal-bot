@@ -5,10 +5,12 @@ import {
   updateOrderStatus,
   recordPayment,
   getUserByTelegramId,
+  getAdminTelegramId,
+  isTxIdUsed,
   Order,
   CartItem,
 } from "../../db/index";
-import { verifyPaymentSms } from "../../utilis/smsParser";
+import { parseBankSMS, verifyPaymentSms } from "../../utilis/smsParser";
 import { getDashboardKeyboard, getPaymentActionsKeyboard } from "../keyboards";
 
 export async function paymentSmsConversation(
@@ -97,77 +99,148 @@ export async function paymentSmsConversation(
   let inputSmsText: string | undefined = smsCtx.message?.text?.trim();
 
   // 2. Handle Receipt Photo / Screenshot
-  const adminId = process.env.ADMIN_TELEGRAM_ID;
+  const adminId = getAdminTelegramId();
   if (smsCtx.message?.photo && smsCtx.message.photo.length > 0) {
     const photo = smsCtx.message.photo[smsCtx.message.photo.length - 1];
     const caption = smsCtx.message.caption?.trim() || "";
 
-    // If caption contains SMS text, try verifying caption first
-    if (caption.length >= 15) {
-      const parsed = verifyPaymentSms(caption, order.total_amount);
-      if (parsed.isValid) {
-        inputSmsText = caption;
-      }
-    }
+    if (adminId && !isNaN(Number(adminId))) {
+      try {
+        const { InlineKeyboard } = await import("grammy");
+        const adminApproveKb = new InlineKeyboard()
+          .text("✅ Approve Payment", `admin:approve_order:${order.order_code}`)
+          .text("❌ Reject Payment", `admin:reject_order:${order.order_code}`);
 
-    if (!inputSmsText) {
-      if (adminId && !isNaN(Number(adminId))) {
-        try {
-          const { InlineKeyboard } = await import("grammy");
-          const adminApproveKb = new InlineKeyboard()
-            .text("✅ Approve Payment", `admin:approve_order:${order.order_code}`)
-            .text("❌ Reject Payment", `admin:reject_order:${order.order_code}`);
+        const customer = getUserByTelegramId(telegramId);
+        const customerDisplay = customer?.full_name || smsCtx.from?.first_name || "Customer";
+        const customerContact = customer?.phone_number || (smsCtx.from?.username ? `@${smsCtx.from.username}` : `ID: ${telegramId}`);
 
-          await smsCtx.api.sendPhoto(Number(adminId), photo.file_id, {
-            caption:
-              `📸 **Receipt Screenshot Submitted for Review!**\n\n` +
-              `• **Order:** #${order.order_code}\n` +
-              `• **Amount Due:** ${order.total_amount.toFixed(2)} ETB\n` +
-              `• **Items:**\n${itemsSummary}\n\n` +
-              `Click below to approve or reject:`,
+        await smsCtx.api.sendPhoto(Number(adminId), photo.file_id, {
+          caption:
+            `📸 **Receipt Screenshot Submitted for Approval!**\n\n` +
+            `• **Order:** #${order.order_code}\n` +
+            `• **Customer:** ${customerDisplay} (${customerContact})\n` +
+            `• **Amount Due:** ${order.total_amount.toFixed(2)} ETB\n` +
+            `• **Items:**\n${itemsSummary}\n` +
+            (caption ? `• **Caption:** ${caption}\n` : "") +
+            `\n👉 *Check your CBE / Telebirr balance, then tap below:*`,
+          parse_mode: "Markdown",
+          reply_markup: adminApproveKb,
+        });
+
+        smsCtx.session.cart = [];
+        smsCtx.session.pendingOrderCode = null;
+
+        await smsCtx.reply(
+          `📸 **Receipt Screenshot Received!**\n\n` +
+            `Your payment screenshot for Order **#${order.order_code}** has been forwarded to our manager for instant confirmation.\n\n` +
+            `⏳ **Status:** **PENDING ADMIN APPROVAL**\n\n` +
+            `You will receive an instant notification right here as soon as it is approved! 👨‍🍳`,
+          {
             parse_mode: "Markdown",
-            reply_markup: adminApproveKb,
-          });
-
-          await smsCtx.reply(
-            `📸 **Receipt Screenshot Received!**\n\n` +
-              `Your payment screenshot for Order **#${order.order_code}** has been forwarded to our admin team for instant review.\n` +
-              `You will receive a notification here as soon as it is approved!`,
-            {
-              parse_mode: "Markdown",
-              reply_markup: getDashboardKeyboard(0),
-            }
-          );
-          return;
-        } catch (err) {
-          console.warn("Could not forward screenshot to admin:", err);
-        }
+            reply_markup: getDashboardKeyboard(0),
+          }
+        );
+        return;
+      } catch (err) {
+        console.warn("Could not forward screenshot to admin:", err);
       }
-
-      await smsCtx.reply(
-        `📸 We received your screenshot! For instant automatic verification, please copy and paste the text of the Bank SMS here, or wait for admin confirmation.`,
-        {
-          reply_markup: getPaymentActionsKeyboard(order.order_code),
-        }
-      );
-      return;
     }
+
+    await smsCtx.reply(
+      `📸 We received your screenshot! Please wait while the manager confirms your order.`,
+      {
+        reply_markup: getDashboardKeyboard(0),
+      }
+    );
+    return;
   }
 
+  // 3. Handle SMS Text Submission
   if (!inputSmsText) {
     await smsCtx.reply(
-      "⚠️ Please paste the bank SMS message text. You can try again below:",
+      "⚠️ Please paste the bank SMS message text (or send a receipt photo). You can try again below:",
       { reply_markup: getPaymentActionsKeyboard(order.order_code) }
     );
     return;
   }
 
-  // Show verification in progress
+  // Parse SMS text to extract bank name, transaction ID, and amount
+  const parsed = parseBankSMS(inputSmsText);
+
+  // Anti-fraud: Check if this Transaction ID was already registered and approved
+  if (parsed.txId && isTxIdUsed(parsed.txId)) {
+    await smsCtx.reply(
+      `⚠️ **Duplicate Transaction ID Detected!**\n\n` +
+        `Transaction reference \`${parsed.txId}\` has already been submitted and verified for another order. Reusing previous receipts is not permitted.`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: getPaymentActionsKeyboard(order.order_code),
+      }
+    );
+    return;
+  }
+
+  // If Admin is configured, send the SMS text to the Admin for approval!
+  if (adminId && !isNaN(Number(adminId))) {
+    try {
+      const { InlineKeyboard } = await import("grammy");
+      const adminApproveKb = new InlineKeyboard()
+        .text("✅ Approve Payment", `admin:approve_order:${order.order_code}`)
+        .text("❌ Reject Payment", `admin:reject_order:${order.order_code}`);
+
+      const customer = getUserByTelegramId(telegramId);
+      const customerDisplay = customer?.full_name || smsCtx.from?.first_name || "Customer";
+      const customerContact = customer?.phone_number || (smsCtx.from?.username ? `@${smsCtx.from.username}` : `ID: ${telegramId}`);
+
+      await smsCtx.api.sendMessage(
+        Number(adminId),
+        `🔔 **New Payment SMS Submitted for Approval!**\n\n` +
+          `📋 **Order:** #${order.order_code}\n` +
+          `👤 **Customer:** ${customerDisplay} (${customerContact})\n` +
+          `🍽️ **Items Ordered:**\n${itemsSummary}\n\n` +
+          `💰 **Amount Expected:** **${order.total_amount.toFixed(2)} ETB**\n` +
+          `🏦 **Detected Bank:** ${parsed.bankName}\n` +
+          `🔢 **Detected Tx ID:** \`${parsed.txId || "N/A"}\`\n` +
+          `💵 **Amount in SMS:** ${parsed.amount ? `${parsed.amount.toFixed(2)} ETB` : "Not detected"}\n\n` +
+          `💬 **Customer's Full SMS Text:**\n` +
+          `\`\`\`\n${inputSmsText}\n\`\`\`\n\n` +
+          `👉 *Check your CBE / Telebirr balance, then tap to approve or reject:*`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: adminApproveKb,
+        }
+      );
+
+      // Save raw_sms and txId in order
+      if (parsed.txId) {
+        updateOrderStatus(order.id, "PENDING_PAYMENT", parsed.txId);
+      }
+
+      smsCtx.session.cart = [];
+      smsCtx.session.pendingOrderCode = null;
+
+      await smsCtx.reply(
+        `📩 **Payment SMS Received!**\n\n` +
+          `Your payment confirmation for Order **#${order.order_code}** has been forwarded to our restaurant manager for approval.\n\n` +
+          `⏳ **Status:** **PENDING ADMIN APPROVAL**\n\n` +
+          `You will receive an instant notification right here as soon as it is approved! 👨‍🍳`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: getDashboardKeyboard(0),
+        }
+      );
+      return;
+    } catch (err) {
+      console.warn("Could not forward SMS to admin:", err);
+    }
+  }
+
+  // Fallback: If no Admin is configured, use automated verification
   await smsCtx.reply("🔍 *Authenticating Bank SMS with payment ledger...*", {
     parse_mode: "Markdown",
   });
 
-  // Verify SMS
   const result = verifyPaymentSms(inputSmsText, order.total_amount);
 
   if (!result.isValid) {
@@ -195,13 +268,11 @@ export async function paymentSmsConversation(
 
   updateOrderStatus(order.id, "PAID", result.txId!);
 
-  // Clear user's cart now that order is paid
   smsCtx.session.cart = [];
   smsCtx.session.pendingOrderCode = null;
 
   const user = getUserByTelegramId(telegramId);
 
-  // Send receipt
   await smsCtx.reply(
     `🎉 **PAYMENT AUTHENTICATED SUCCESSFULLY!** ✅\n\n` +
       `🧾 **Official Payment Receipt:**\n` +
@@ -216,6 +287,11 @@ export async function paymentSmsConversation(
       `📦 **Status:** **PAID & PREPARING 👨‍🍳**\n` +
       `──────────────────────────────\n\n` +
       `🍽️ Our kitchen has received your order and is preparing it now! We'll notify you as soon as it's ready.`,
+    {
+      parse_mode: "Markdown",
+      reply_markup: getDashboardKeyboard(0),
+    }
+  );
     {
       parse_mode: "Markdown",
       reply_markup: getDashboardKeyboard(0),
