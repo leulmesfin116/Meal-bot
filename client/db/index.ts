@@ -65,6 +65,8 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_telegram_id', '1765723442');
 `);
 
 export interface User {
