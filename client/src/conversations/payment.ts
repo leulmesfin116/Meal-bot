@@ -292,11 +292,6 @@ export async function paymentSmsConversation(
       reply_markup: getDashboardKeyboard(0),
     }
   );
-    {
-      parse_mode: "Markdown",
-      reply_markup: getDashboardKeyboard(0),
-    }
-  );
 
   // Notify admin if configured, with kitchen status progression buttons
   if (adminId && !isNaN(Number(adminId))) {
